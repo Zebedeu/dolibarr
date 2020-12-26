@@ -285,9 +285,10 @@ class SecurityTest extends PHPUnit\Framework\TestCase
         $_POST["param6"]="&quot;&gt;<svg o&#110;load='console.log(&quot;123&quot;)'&gt;";
         $_GET["param7"]='"c:\this is a path~1\aaa&#110;" abc<bad>def</bad>';
         $_POST["param8"]="Hacker<svg o&#110;load='console.log(&quot;123&quot;)'";	// html tag is not closed so it is not detected as html tag but is still harmfull
+		$_POST["param9"]='is_object($object) ? ($object->id < 10 ? round($object->id / 2, 2) : (2 * $user->id) * (int) substr($mysoc->zip, 1, 2)) : \'objnotdefined\'';
+		$_POST["param10"]='is_object($object) ? ($object->id < 10 ? round($object->id / 2, 2) : (2 * $user->id) * (int) substr($mysoc->zip, 1, 2)) : \'<abc>objnotdefined\'';
 
-        // Test int
-        $result=GETPOST('id', 'int');              // Must return nothing
+		$result=GETPOST('id', 'int');              // Must return nothing
         print __METHOD__." result=".$result."\n";
         $this->assertEquals($result, '');
 
@@ -347,6 +348,14 @@ class SecurityTest extends PHPUnit\Framework\TestCase
         print __METHOD__." result=".$result."\n";
         $this->assertEquals("Hacker<svg onload='console.log(123)'", $result);
 
+        $result=GETPOST("param9", 'alphanohtml');
+        print __METHOD__." result=".$result."\n";
+        $this->assertEquals($_POST["param9"], $result);
+
+        $result=GETPOST("param10", 'alphanohtml');
+        print __METHOD__." result=".$result."\n";
+        $this->assertEquals($_POST["param9"], $result, 'We should get param9 after processing param10');
+
         return $result;
     }
 
@@ -367,7 +376,7 @@ class SecurityTest extends PHPUnit\Framework\TestCase
 
         $login=checkLoginPassEntity('admin', 'admin', 1, array('dolibarr'));            // Should works because admin/admin exists
         print __METHOD__." login=".$login."\n";
-        $this->assertEquals($login, 'admin');
+        $this->assertEquals($login, 'admin', 'The test to check if pass of user "admin" is "admin" has failed');
 
         $login=checkLoginPassEntity('admin', 'admin', 1, array('http','dolibarr'));    // Should work because of second authetntication method
         print __METHOD__." login=".$login."\n";
@@ -543,5 +552,28 @@ class SecurityTest extends PHPUnit\Framework\TestCase
 		*/
 
     	return 0;
+    }
+
+    /**
+     * testDolSanitizeFileName
+     *
+     * @return void
+     */
+    public function testDolSanitizeFileName()
+    {
+    	global $conf,$user,$langs,$db;
+    	$conf=$this->savconf;
+    	$user=$this->savuser;
+    	$langs=$this->savlangs;
+    	$db=$this->savdb;
+
+    	//$dummyuser=new User($db);
+    	//$result=restrictedArea($dummyuser,'societe');
+
+    	$result=dol_sanitizeFileName('bad file | evilaction');
+    	$this->assertEquals('bad file _ evilaction', $result);
+
+    	$result=dol_sanitizeFileName('bad file --evilparam');
+    	$this->assertEquals('bad file _evilparam', $result);
     }
 }
