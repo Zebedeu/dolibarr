@@ -457,22 +457,24 @@ function run_sql($sqlfile, $silent = 1, $entity = '', $usesavepoint = 1, $handle
 		} else {
 			print '<span class="error">'.$langs->trans("Error").'</span>';
 		}
-		//if (! empty($conf->use_javascript_ajax)) {
-			print '<script type="text/javascript" language="javascript">
-			jQuery(document).ready(function() {
-				function init_trrunsql()
-				{
-					console.log("toggle .trforrunsql");
-					jQuery(".trforrunsql").toggle();
-				}
+
+		//if (!empty($conf->use_javascript_ajax)) {		// use_javascript_ajax is not defined
+		print '<script type="text/javascript" language="javascript">
+		jQuery(document).ready(function() {
+			function init_trrunsql()
+			{
+				console.log("toggle .trforrunsql");
+				jQuery(".trforrunsql").toggle();
+			}
+			init_trrunsql();
+			jQuery(".trforrunsqlshowhide").click(function() {
 				init_trrunsql();
-				jQuery(".trforrunsqlshowhide").click(function() {
-					init_trrunsql();
-				});
 			});
-			</script>';
-			print ' - <a class="trforrunsqlshowhide" href="#">'.$langs->trans("ShowHideDetails").'</a>';
+		});
+		</script>';
+		print ' - <a class="trforrunsqlshowhide" href="#">'.$langs->trans("ShowHideDetails").'</a>';
 		//}
+
 		print '</td></tr>'."\n";
 	}
 
@@ -1439,7 +1441,13 @@ function complete_elementList_with_modules(&$elementList)
 							//print "x".$modName." ".$orders[$i]."\n<br>";
 
 							if (!empty($objMod->module_parts['contactelement'])) {
-								$elementList[$objMod->name] = $langs->trans($objMod->name);
+								if (is_array($objMod->module_parts['contactelement'])) {
+									foreach ($objMod->module_parts['contactelement'] as $elem => $title) {
+										$elementList[$elem] = $langs->trans($title);
+									}
+								} else {
+									$elementList[$objMod->name] = $langs->trans($objMod->name);
+								}
 							}
 
 							$j++;
@@ -1864,17 +1872,17 @@ function email_admin_prepare_head()
 		}
 	}
 
-	$head[$h][0] = DOL_URL_ROOT."/admin/mails_templates.php";
-	$head[$h][1] = $langs->trans("EMailTemplates");
-	$head[$h][2] = 'templates';
-	$h++;
-
 	if (!empty($user->admin) && (empty($_SESSION['leftmenu']) || $_SESSION['leftmenu'] != 'email_templates')) {
 		$head[$h][0] = DOL_URL_ROOT."/admin/mails_senderprofile_list.php";
 		$head[$h][1] = $langs->trans("EmailSenderProfiles");
 		$head[$h][2] = 'senderprofiles';
 		$h++;
 	}
+
+	$head[$h][0] = DOL_URL_ROOT."/admin/mails_templates.php";
+	$head[$h][1] = $langs->trans("EMailTemplates");
+	$head[$h][2] = 'templates';
+	$h++;
 
 	complete_head_from_modules($conf, $langs, null, $head, $h, 'email_admin', 'remove');
 

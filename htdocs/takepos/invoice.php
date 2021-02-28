@@ -1,6 +1,7 @@
 <?php
 /**
  * Copyright (C) 2018    Andreu Bisquerra    <jove@bisquerra.com>
+ * Copyright (C) 2021    Nicolas ZABOURI    <info@inovea-conseil.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -173,11 +174,13 @@ if ($action == 'valid' && $user->rights->facture->creer)
 
 	if ($invoice->total_ttc < 0) {
 		$invoice->type = $invoice::TYPE_CREDIT_NOTE;
+
 		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."facture WHERE";
 		$sql .= " fk_soc = ".((int) $invoice->socid);
 		$sql .= " AND type <> ".Facture::TYPE_CREDIT_NOTE;
 		$sql .= " AND fk_statut >= ".$invoice::STATUS_VALIDATED;
 		$sql .= " ORDER BY rowid DESC";
+
 		$resql = $db->query($sql);
 		if ($resql) {
 			$obj = $db->fetch_object($resql);
@@ -268,7 +271,7 @@ if ($action == 'valid' && $user->rights->facture->creer)
 
 		if ($remaintopay == 0) {
 			dol_syslog("Invoice is paid, so we set it to status Paid");
-			$result = $invoice->set_paid($user);
+			$result = $invoice->setPaid($user);
 			if ($result > 0) $invoice->paye = 1;
 			// set payment method
 			$invoice->setPaymentMethods($paiementid);
@@ -528,7 +531,9 @@ if ($action == "freezone") {
 
 	$tva_tx = GETPOST('tva_tx', 'alpha');
 	if ($tva_tx != '') {
-		$tva_tx = price2num($tva_tx);
+		if (!preg_match('/\((.*)\)/', $tva_tx)) {
+			$tva_tx = price2num($tva_tx);
+		}
 	} else {
 		$tva_tx = get_default_tva($mysoc, $customer);
 	}
@@ -572,16 +577,9 @@ if ($action == "deleteline") {
 	}
 }
 
+// Action to delete or discard an invoice
 if ($action == "delete") {
 	// $placeid is the invoice id (it differs from place) and is defined if the place is set and the ref of invoice is '(PROV-POS'.$_SESSION["takeposterminal"].'-'.$place.')', so the fetch at begining of page works.
-
-	/*$reg = array();
-	if (preg_match('/^(\d+)-(\d+)$/', $place, $reg)) {
-
-		$place = $reg[1];
-		var_dump($place);
-	}*/
-
 	if ($placeid > 0) {
 		$result = $invoice->fetch($placeid);
 
@@ -599,7 +597,9 @@ if ($action == "delete") {
 				}
 			}
 
-			$sql = "UPDATE ".MAIN_DB_PREFIX."facture set fk_soc=".$conf->global->{'CASHDESK_ID_THIRDPARTY'.$_SESSION["takeposterminal"]};
+			$sql = "UPDATE ".MAIN_DB_PREFIX."facture";
+			$sql .= " SET fk_soc=".$conf->global->{'CASHDESK_ID_THIRDPARTY'.$_SESSION["takeposterminal"]}.", ";
+			$sql .= " datec = '".$db->idate(dol_now())."'";
 			$sql .= " WHERE ref='(PROV-POS".$db->escape($_SESSION["takeposterminal"]."-".$place).")'";
 			$resql1 = $db->query($sql);
 
@@ -1003,7 +1003,7 @@ function CreditNote() {
 
 
 $( document ).ready(function() {
-	console.log("Set customer info and sales in header");
+	console.log("Set customer info and sales in header placeid=<?php echo $placeid; ?> status=<?php echo $invoice->statut; ?>");
 
     <?php
 	$s = $langs->trans("Customer");
@@ -1018,25 +1018,36 @@ $( document ).ready(function() {
 
 	<?php
 	$sql = "SELECT rowid, datec, ref FROM ".MAIN_DB_PREFIX."facture";
-	$sql .= " WHERE ref LIKE '(PROV-POS".$_SESSION["takeposterminal"]."-0%' AND entity IN (".getEntity('invoice').")";
+	if (empty($conf->global->TAKEPOS_CAN_EDIT_IF_ALREADY_VALIDATED)) {
+		// By default, only invoices with a ref not already defined can in list of open invoice we can edit.
+		$sql .= " WHERE ref LIKE '(PROV-POS".$db->escape($_SESSION["takeposterminal"])."-0%' AND entity IN (".getEntity('invoice').")";
+	} else {
+		// If TAKEPOS_CAN_EDIT_IF_ALREADY_VALIDATED set, we show also draft invoice that already has a reference defined
+		$sql .= " WHERE pos_source = '".$db->escape($_SESSION["takeposterminal"])."'";
+		$sql .= " AND module_source = 'takepos'";
+		$sql .= " AND entity IN (".getEntity('invoice').")";
+	}
+
 	$sql .= $db->order('datec', 'ASC');
 	$resql = $db->query($sql);
 	if ($resql) {
 		while ($obj = $db->fetch_object($resql)) {
 			echo '$("#customerandsales").append(\'';
-			echo '<a class="valignmiddle" onclick="place=\\\'';
+			echo '<a class="valignmiddle" title="'.dol_escape_js($langs->trans("SaleStartedAt", dol_print_date($db->jdate($obj->datec), '%H:%M', 'tzuser'))).'" onclick="place=\\\'';
 			$num_sale = str_replace(")", "", str_replace("(PROV-POS".$_SESSION["takeposterminal"]."-", "", $obj->ref));
 			echo $num_sale;
 			if (str_replace("-", "", $num_sale) > $max_sale) $max_sale = str_replace("-", "", $num_sale);
-			echo '\\\';Refresh();">';
+			echo '\\\'; invoiceid=\\\'';
+			echo $obj->rowid;
+			echo '\\\'; Refresh();">';
 			if ($placeid == $obj->rowid) echo "<b>";
-			echo date('H:i', strtotime($obj->datec));
+			echo dol_print_date($db->jdate($obj->datec), '%H:%M', 'tzuser');
 			if ($placeid == $obj->rowid) echo "</b>";
 			echo '</a>\');';
 		}
 		echo '$("#customerandsales").append(\'<a onclick="place=\\\'0-';
 		echo $max_sale + 1;
-		echo '\\\';Refresh();"><span class="fa fa-plus-square" title="'.dol_escape_htmltag($langs->trans("StartAParallelSale")).'"></a>\');';
+		echo '\\\'; invoiceid=0; Refresh();"><span class="fa fa-plus-square" title="'.dol_escape_htmltag($langs->trans("StartAParallelSale")).'"></a>\');';
 	} else {
 		dol_print_error($db);
 	}
@@ -1110,7 +1121,10 @@ print '<!-- invoice.php place='.(int) $place.' invoice='.$invoice->ref.' mobilep
 print '<div class="div-table-responsive-no-min invoice">';
 print '<table id="tablelines" class="noborder noshadow postablelines" width="100%">';
 if ($sectionwithinvoicelink && ($mobilepage == "invoice" || $mobilepage == "")) {
-	print '<tr><td colspan="4">'.$sectionwithinvoicelink.'</td></tr>';
+    if (!empty($conf->global->TAKEPOS_SHOW_HT)) { print '<tr><td colspan="5">'.$sectionwithinvoicelink.'</td></tr>'; }
+	else {
+		print '<tr><td colspan="4">'.$sectionwithinvoicelink.'</td></tr>';
+	}
 }
 print '<tr class="liste_titre nodrag nodrop">';
 print '<td class="linecoldescription">';
@@ -1144,6 +1158,23 @@ if ($_SESSION["basiclayout"] != 1)
 {
 	print '<td class="linecolqty right">'.$langs->trans('ReductionShort').'</td>';
 	print '<td class="linecolqty right">'.$langs->trans('Qty').'</td>';
+	if ($conf->global->TAKEPOS_SHOW_HT) {
+        print '<td class="linecolht right nowraponall">';
+        print '<span class="opacitymedium small">' . $langs->trans('TotalHTShort') . '</span><br>';
+        // In phone version only show when it is invoice page
+        if ($mobilepage == "invoice" || $mobilepage == "") {
+            print '<span id="linecolht-span-total" style="font-size:1.3em; font-weight: bold;">' . price($invoice->total_ht, 1, '', 1, -1, -1, $conf->currency) . '</span>';
+            if (!empty($conf->multicurrency->enabled) && $_SESSION["takeposcustomercurrency"] != "" && $conf->currency != $_SESSION["takeposcustomercurrency"]) {
+                //Only show customer currency if multicurrency module is enabled, if currency selected and if this currency selected is not the same as main currency
+                include_once DOL_DOCUMENT_ROOT . '/multicurrency/class/multicurrency.class.php';
+                $multicurrency = new MultiCurrency($db);
+                $multicurrency->fetch(0, $_SESSION["takeposcustomercurrency"]);
+                print '<br><span id="linecolht-span-total" style="font-size:0.9em; font-style:italic;">(' . price($invoice->total_ht * $multicurrency->rate->rate) . ' ' . $_SESSION["takeposcustomercurrency"] . ')</span>';
+            }
+            print '</td>';
+        }
+        print '</td>';
+    }
 	print '<td class="linecolht right nowraponall">';
 	print '<span class="opacitymedium small">'.$langs->trans('TotalTTCShort').'</span><br>';
 	// In phone version only show when it is invoice page
@@ -1363,6 +1394,18 @@ if ($placeid > 0)
 				}
 
 				$htmlforlines .= '</td>';
+                if ($conf->global->TAKEPOS_SHOW_HT) {
+                    $htmlforlines .= '<td class="right classfortooltip" title="'.$moreinfo.'">';
+                    $htmlforlines .= price($line->total_ht, 1, '', 1, -1, -1, $conf->currency);
+                    if (!empty($conf->multicurrency->enabled) && $_SESSION["takeposcustomercurrency"] != "" && $conf->currency != $_SESSION["takeposcustomercurrency"]) {
+                        //Only show customer currency if multicurrency module is enabled, if currency selected and if this currency selected is not the same as main currency
+                        include_once DOL_DOCUMENT_ROOT.'/multicurrency/class/multicurrency.class.php';
+                        $multicurrency = new MultiCurrency($db);
+                        $multicurrency->fetch(0, $_SESSION["takeposcustomercurrency"]);
+                        $htmlforlines .= '<br><span id="linecolht-span-total" style="font-size:0.9em; font-style:italic;">('.price($line->total_ht * $multicurrency->rate->rate).' '.$_SESSION["takeposcustomercurrency"].')</span>';
+                    }
+                    $htmlforlines .= '</td>';
+                }
 				$htmlforlines .= '<td class="right classfortooltip" title="'.$moreinfo.'">';
 				$htmlforlines .= price($line->total_ttc, 1, '', 1, -1, -1, $conf->currency);
 				if (!empty($conf->multicurrency->enabled) && $_SESSION["takeposcustomercurrency"] != "" && $conf->currency != $_SESSION["takeposcustomercurrency"]) {
@@ -1380,10 +1423,15 @@ if ($placeid > 0)
 			print $htmlforlines;
 		}
 	} else {
-		print '<tr class="drag drop oddeven"><td class="left"><span class="opacitymedium">'.$langs->trans("Empty").'</span></td><td></td><td></td><td></td></tr>';
+		print '<tr class="drag drop oddeven"><td class="left"><span class="opacitymedium">'.$langs->trans("Empty").'</span></td><td></td><td></td><td></td>';
+		if (!empty($conf->global->TAKEPOS_SHOW_HT)){ print '<td></td>'; }
+		print '</tr>';
 	}
 } else {      // No invoice generated yet
-	print '<tr class="drag drop oddeven"><td class="left"><span class="opacitymedium">'.$langs->trans("Empty").'</span></td><td></td><td></td><td></td></tr>';
+	print '<tr class="drag drop oddeven"><td class="left"><span class="opacitymedium">'.$langs->trans("Empty").'</span></td><td></td><td></td><td></td>';
+
+    if (!empty($conf->global->TAKEPOS_SHOW_HT)){ print '<td></td>'; }
+    print '</tr>';
 }
 
 print '</table>';

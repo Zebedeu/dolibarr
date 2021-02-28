@@ -63,7 +63,7 @@ if ($action == 'update') {
 		$res = dolibarr_set_const($db, "MEMBER_NEWFORM_FORCETYPE", $forcetype, 'chaine', 0, '', $conf->entity);
 	}
 
-	if (!$res > 0) $error++;
+	if (!($res > 0)) $error++;
 
  	if (!$error) {
 		setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
@@ -133,6 +133,7 @@ if ($conf->use_javascript_ajax) {
 
 print '<span class="opacitymedium">'.$langs->trans("BlankSubscriptionFormDesc").'</span><br><br>';
 
+$param = '';
 
 $enabledisablehtml = $langs->trans("EnablePublicSubscriptionForm").' ';
 if (empty($conf->global->MEMBER_ENABLE_PUBLIC)) {
