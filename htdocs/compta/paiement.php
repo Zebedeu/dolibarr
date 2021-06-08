@@ -8,7 +8,7 @@
  * Copyright (C) 2014       Raphaël Doursenaud      <rdoursenaud@gpcsolutions.fr>
  * Copyright (C) 2014       Teddy Andreotti         <125155@supinfo.com>
  * Copyright (C) 2015       Juanjo Menent           <jmenent@2byte.es>
- * Copyright (C) 2018-2019  Frédéric France         <frederic.france@netlogic.fr>
+ * Copyright (C) 2018-2021  Frédéric France         <frederic.france@netlogic.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -465,7 +465,7 @@ if ($action == 'create' || $action == 'confirm_paiement' || $action == 'add_paie
 
 		// Date payment
 		print '<tr><td><span class="fieldrequired">'.$langs->trans('Date').'</span></td><td>';
-		$datepayment = dol_mktime(12, 0, 0, $_POST['remonth'], $_POST['reday'], $_POST['reyear']);
+		$datepayment = dol_mktime(12, 0, 0, GETPOST('remonth', 'int'), GETPOST('reday', 'int'), GETPOST('reyear', 'int'));
 		$datepayment = ($datepayment == '' ? (empty($conf->global->MAIN_AUTOFILL_DATE) ?-1 : '') : $datepayment);
 		print $form->selectDate($datepayment, '', '', '', 0, "add_paiement", 1, 1, 0, '', '', $facture->date);
 		print '</td></tr>';
@@ -559,12 +559,14 @@ if ($action == 'create' || $action == 'confirm_paiement' || $action == 'add_paie
 				$alreadypayedlabel = $langs->trans('Received');
 				$multicurrencyalreadypayedlabel = $langs->trans('MulticurrencyReceived');
 				if ($facture->type == 2) {
-					$alreadypayedlabel = $langs->trans("PaidBack"); $multicurrencyalreadypayedlabel = $langs->trans("MulticurrencyPaidBack");
+					$alreadypayedlabel = $langs->trans("PaidBack");
+					$multicurrencyalreadypayedlabel = $langs->trans("MulticurrencyPaidBack");
 				}
 				$remaindertopay = $langs->trans('RemainderToTake');
 				$multicurrencyremaindertopay = $langs->trans('MulticurrencyRemainderToTake');
 				if ($facture->type == 2) {
-					$remaindertopay = $langs->trans("RemainderToPayBack"); $multicurrencyremaindertopay = $langs->trans("MulticurrencyRemainderToPayBack");
+					$remaindertopay = $langs->trans("RemainderToPayBack");
+					$multicurrencyremaindertopay = $langs->trans("MulticurrencyRemainderToPayBack");
 				}
 
 				$i = 0;
@@ -596,7 +598,7 @@ if ($action == 'create' || $action == 'confirm_paiement' || $action == 'add_paie
 				print '<td align="right">&nbsp;</td>';
 				print "</tr>\n";
 
-				$total = 0;
+				$total_ttc = 0;
 				$totalrecu = 0;
 				$totalrecucreditnote = 0;
 				$totalrecudeposits = 0;
@@ -711,17 +713,17 @@ if ($action == 'create' || $action == 'confirm_paiement' || $action == 'add_paie
 					}
 
 					// Price
-					print '<td class="right">'.price($sign * $objp->total_ttc).'</td>';
+					print '<td class="right"><span class="amount">'.price($sign * $objp->total_ttc).'</span></td>';
 
 					// Received + already paid
-					print '<td class="right">'.price($sign * $paiement);
+					print '<td class="right"><span class="amount">'.price($sign * $paiement);
 					if ($creditnotes) {
 						print '<span class="opacitymedium">+'.price($creditnotes).'</span>';
 					}
 					if ($deposits) {
 						print '<span class="opacitymedium">+'.price($deposits).'</span>';
 					}
-					print '</td>';
+					print '</span></td>';
 
 					// Remain to take or to pay back
 					print '<td class="right">'.price($sign * $remaintopay).'</td>';
@@ -752,15 +754,14 @@ if ($action == 'create' || $action == 'confirm_paiement' || $action == 'add_paie
 					// Warning
 					print '<td align="center" width="16">';
 					//print "xx".$amounts[$invoice->id]."-".$amountsresttopay[$invoice->id]."<br>";
-					if ($amounts[$invoice->id] && (abs($amounts[$invoice->id]) > abs($amountsresttopay[$invoice->id]))
-						|| $multicurrency_amounts[$invoice->id] && (abs($multicurrency_amounts[$invoice->id]) > abs($multicurrency_amountsresttopay[$invoice->id]))) {
+					if (!empty($amounts[$invoice->id]) && (abs($amounts[$invoice->id]) > abs($amountsresttopay[$invoice->id]))
+						|| !empty($multicurrency_amounts[$invoice->id]) && (abs($multicurrency_amounts[$invoice->id]) > abs($multicurrency_amountsresttopay[$invoice->id]))) {
 						print ' '.img_warning($langs->trans("PaymentHigherThanReminderToPay"));
 					}
 					print '</td>';
 
 					print "</tr>\n";
 
-					$total += $objp->total;
 					$total_ttc += $objp->total_ttc;
 					$totalrecu += $paiement;
 					$totalrecucreditnote += $creditnotes;
@@ -871,7 +872,7 @@ if (!GETPOST('action', 'aZ09')) {
 	$sql .= ' WHERE p.fk_facture = f.rowid';
 	$sql .= ' AND f.entity IN ('.getEntity('invoice').')';
 	if ($socid) {
-		$sql .= ' AND f.fk_soc = '.$socid;
+		$sql .= ' AND f.fk_soc = '.((int) $socid);
 	}
 
 	$sql .= ' ORDER BY '.$sortfield.' '.$sortorder;
@@ -899,7 +900,7 @@ if (!GETPOST('action', 'aZ09')) {
 			print '<td><a href="'.DOL_URL_ROOT.'/compta/facture/card.php?facid='.$objp->facid.'">'.$objp->ref."</a></td>\n";
 			print '<td>'.dol_print_date($db->jdate($objp->dp))."</td>\n";
 			print '<td>'.$objp->paiement_type.' '.$objp->num_payment."</td>\n";
-			print '<td class="right">'.price($objp->amount).'</td>';
+			print '<td class="right"><span class="amount">'.price($objp->amount).'</span></td>';
 			print '<td>&nbsp;</td>';
 			print '</tr>';
 

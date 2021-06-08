@@ -42,7 +42,7 @@ if ($user->socid > 0) {
 }
 
 // Load translation files required by the page
-$langs->loadLangs(array("companies", "admin", "users", "other"));
+$langs->loadLangs(array("companies", "admin", "users", "other","withdrawals"));
 
 // Load variable for pagination
 $limit = GETPOST('limit', 'int') ?GETPOST('limit', 'int') : $conf->liste_limit;
@@ -68,14 +68,22 @@ $search_user = GETPOST("search_user", "alpha");
 $search_desc = GETPOST("search_desc", "alpha");
 $search_ua   = GETPOST("search_ua", "restricthtml");
 $search_prefix_session = GETPOST("search_prefix_session", "restricthtml");
+$optioncss = GETPOST("optioncss", "aZ"); // Option for the css output (always '' except when 'print')
 
-if (GETPOST("date_startmonth") == '' || GETPOST("date_startmonth") > 0) {
-	$date_start = dol_mktime(0, 0, 0, GETPOST("date_startmonth"), GETPOST("date_startday"), GETPOST("date_startyear"));
+$now = dol_now();
+$nowarray = dol_getdate($now);
+
+if (!GETPOSTISSET("date_startmonth")) {
+	$date_start = dol_get_first_day($nowarray['year'], $nowarray['mon'], 'tzuserrel');
+} elseif (GETPOST("date_startmonth") > 0) {
+	$date_start = dol_mktime(0, 0, 0, GETPOST("date_startmonth", 'int'), GETPOST("date_startday", 'int'), GETPOST("date_startyear", 'int'), 'tzuserrel');
 } else {
 	$date_start = -1;
 }
-if (GETPOST("date_endmonth") == '' || GETPOST("date_endmonth") > 0) {
-	$date_end = dol_mktime(23, 59, 59, GETPOST("date_endmonth"), GETPOST("date_endday"), GETPOST("date_endyear"));
+if (!GETPOSTISSET("date_endmonth")) {
+	$date_end = dol_get_last_hour(dol_now('gmt'), 'tzuserrel');
+} elseif (GETPOST("date_endmonth") > 0) {
+	$date_end = dol_get_last_hour(dol_mktime(23, 59, 59, GETPOST("date_endmonth", 'int'), GETPOST("date_endday", 'int'), GETPOST("date_endyear", 'int'), 'tzuserrel'), 'tzuserrel');
 } else {
 	$date_end = -1;
 }
@@ -85,8 +93,6 @@ if ($date_start > 0 && $date_end > 0 && $date_start > $date_end) {
 	$date_end = $date_start + 86400;
 }
 
-$now = dol_now();
-$nowarray = dol_getdate($now);
 
 if (empty($date_start)) { // We define date_start and date_end
 	$date_start = dol_get_first_day($nowarray['year'], $nowarray['mon'], false);
@@ -113,7 +119,6 @@ $arrayfields = array(
 		'position'=>110
 	)
 );
-
 
 /*
  * Actions
@@ -281,7 +286,7 @@ if ($result) {
 		$param .= "&date_endyear=".urlencode($date_endyear);
 	}
 
-	$langs->load('withdrawals');
+	$center = '';
 	if ($num) {
 		$center = '<a class="butActionDelete" href="'.$_SERVER["PHP_SELF"].'?action=purge">'.$langs->trans("Purge").'</a>';
 	}
@@ -316,19 +321,22 @@ if ($result) {
 	// Fields title search
 	print '<tr class="liste_titre">';
 
-	print '<td class="liste_titre" width="15%">'.$form->selectDate($date_start, 'date_start', 0, 0, 0, '', 1, 0).$form->selectDate($date_end, 'date_end', 0, 0, 0, '', 1, 0).'</td>';
+	print '<td class="liste_titre" width="15%">';
+	print $form->selectDate($date_start, 'date_start', 0, 0, 0, '', 1, 0, 0, '', '', '', '', 1, '', '', 'tzuserrel');
+	print $form->selectDate($date_end, 'date_end', 0, 0, 0, '', 1, 0, 0, '', '', '', '', 1, '', '', 'tzuserrel');
+	print '</td>';
 
 	print '<td class="liste_titre left">';
-	print '<input class="flat maxwidth100" type="text" name="search_code" value="'.$search_code.'">';
+	print '<input class="flat maxwidth100" type="text" name="search_code" value="'.dol_escape_htmltag($search_code).'">';
 	print '</td>';
 
 	// IP
 	print '<td class="liste_titre left">';
-	print '<input class="flat maxwidth100" type="text" name="search_ip" value="'.$search_ip.'">';
+	print '<input class="flat maxwidth100" type="text" name="search_ip" value="'.dol_escape_htmltag($search_ip).'">';
 	print '</td>';
 
 	print '<td class="liste_titre left">';
-	print '<input class="flat maxwidth100" type="text" name="search_user" value="'.$search_user.'">';
+	print '<input class="flat maxwidth100" type="text" name="search_user" value="'.dol_escape_htmltag($search_user).'">';
 	print '</td>';
 
 	print '<td class="liste_titre left">';
@@ -337,13 +345,13 @@ if ($result) {
 
 	if (!empty($arrayfields['e.user_agent']['checked'])) {
 		print '<td class="liste_titre left">';
-		print '<input class="flat maxwidth100" type="text" name="search_ua" value="'.$search_ua.'">';
+		print '<input class="flat maxwidth100" type="text" name="search_ua" value="'.dol_escape_htmltag($search_ua).'">';
 		print '</td>';
 	}
 
 	if (!empty($arrayfields['e.prefix_session']['checked'])) {
 		print '<td class="liste_titre left">';
-		print '<input class="flat maxwidth100" type="text" name="search_prefix_session" value="'.$search_prefix_session.'">';
+		print '<input class="flat maxwidth100" type="text" name="search_prefix_session" value="'.dol_escape_htmltag($search_prefix_session).'">';
 		print '</td>';
 	}
 
@@ -365,7 +373,7 @@ if ($result) {
 		print_liste_field_titre("UserAgent", $_SERVER["PHP_SELF"], "e.user_agent", "", $param, '', $sortfield, $sortorder);
 	}
 	if (!empty($arrayfields['e.prefix_session']['checked'])) {
-		print_liste_field_titre("PrefixSession", $_SERVER["PHP_SELF"], "e.prefix_session", "", $param, '', $sortfield, $sortorder);
+		print_liste_field_titre("SuffixSessionName", $_SERVER["PHP_SELF"], "e.prefix_session", "", $param, '', $sortfield, $sortorder);
 	}
 	print_liste_field_titre('');
 	print "</tr>\n";
@@ -376,7 +384,7 @@ if ($result) {
 		print '<tr class="oddeven">';
 
 		// Date
-		print '<td class="nowrap left">'.dol_print_date($db->jdate($obj->dateevent), '%Y-%m-%d %H:%M:%S').'</td>';
+		print '<td class="nowrap left">'.dol_print_date($db->jdate($obj->dateevent), '%Y-%m-%d %H:%M:%S', 'tzuserrel').'</td>';
 
 		// Code
 		print '<td>'.$obj->type.'</td>';

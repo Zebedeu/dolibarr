@@ -50,7 +50,6 @@ if (!empty($user->socid)) {
 }
 $fieldvalue = (!empty($id) ? $id : (!empty($ref) ? $ref : ''));
 $fieldtype = (!empty($ref) ? 'ref' : 'rowid');
-$result = restrictedArea($user, 'produit|service', $fieldvalue, 'product&product', '', '', $fieldtype);
 
 $object = new Product($db);
 $objectid = 0;
@@ -58,6 +57,19 @@ if ($id > 0 || !empty($ref)) {
 	$result = $object->fetch($id, $ref);
 	$objectid = $object->id;
 	$id = $object->id;
+}
+
+$result = restrictedArea($user, 'produit|service', $fieldvalue, 'product&product', '', '', $fieldtype);
+
+if ($object->id > 0) {
+	if ($object->type == $object::TYPE_PRODUCT) {
+		restrictedArea($user, 'produit', $object->id, 'product&product', '', '');
+	}
+	if ($object->type == $object::TYPE_SERVICE) {
+		restrictedArea($user, 'service', $object->id, 'product&product', '', '');
+	}
+} else {
+	restrictedArea($user, 'produit|service', $fieldvalue, 'product&product', '', '', $fieldtype);
 }
 
 
@@ -167,18 +179,18 @@ if ($action == 'search') {
 }
 
 $title = $langs->trans('ProductServiceCard');
-$helpurl = '';
+$help_url = '';
 $shortlabel = dol_trunc($object->label, 16);
 if (GETPOST("type") == '0' || ($object->type == Product::TYPE_PRODUCT)) {
 	$title = $langs->trans('Product')." ".$shortlabel." - ".$langs->trans('AssociatedProducts');
-	$helpurl = 'EN:Module_Products|FR:Module_Produits|ES:M&oacute;dulo_Productos';
+	$help_url = 'EN:Module_Products|FR:Module_Produits|ES:M&oacute;dulo_Productos|DE:Modul_Produkte';
 }
 if (GETPOST("type") == '1' || ($object->type == Product::TYPE_SERVICE)) {
 	$title = $langs->trans('Service')." ".$shortlabel." - ".$langs->trans('AssociatedProducts');
-	$helpurl = 'EN:Module_Services_En|FR:Module_Services|ES:M&oacute;dulo_Servicios';
+	$help_url = 'EN:Module_Services_En|FR:Module_Services|ES:M&oacute;dulo_Servicios|DE:Modul_Leistungen';
 }
 
-llxHeader('', $title, $helpurl);
+llxHeader('', $title, $help_url);
 
 $head = product_prepare_head($object);
 $titre = $langs->trans("CardProduct".$object->type);
@@ -188,7 +200,7 @@ print dol_get_fiche_head($head, 'subproduct', $titre, -1, $picto);
 
 if ($id > 0 || !empty($ref)) {
 	/*
-	 * Fiche en mode edition
+	 * Product card
 	 */
 	if ($user->rights->produit->lire || $user->rights->service->lire) {
 		$linkback = '<a href="'.DOL_URL_ROOT.'/product/list.php?restore_lastsearch_values=1">'.$langs->trans("BackToList").'</a>';
@@ -205,6 +217,16 @@ if ($id > 0 || !empty($ref)) {
 			print '<div class="underbanner clearboth"></div>';
 
 			print '<table class="border centpercent tableforfield">';
+
+			// Type
+			if (!empty($conf->product->enabled) && !empty($conf->service->enabled)) {
+				$typeformat = 'select;0:'.$langs->trans("Product").',1:'.$langs->trans("Service");
+				print '<tr><td class="titlefieldcreate">';
+				print (empty($conf->global->PRODUCT_DENY_CHANGE_PRODUCT_TYPE)) ? $form->editfieldkey("Type", 'fk_product_type', $object->type, $object, $usercancreate, $typeformat) : $langs->trans('Type');
+				print '</td><td>';
+				print $form->editfieldval("Type", 'fk_product_type', $object->type, $object, $usercancreate, $typeformat);
+				print '</td></tr>';
+			}
 
 			// Nature
 			if ($object->type != Product::TYPE_SERVICE) {

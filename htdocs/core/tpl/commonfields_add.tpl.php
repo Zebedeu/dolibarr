@@ -77,10 +77,12 @@ foreach ($object->fields as $key => $val) {
 		$value = dol_mktime(GETPOST($key.'hour', 'int'), GETPOST($key.'min', 'int'), 0, GETPOST($key.'month', 'int'), GETPOST($key.'day', 'int'), GETPOST($key.'year', 'int'));
 	} elseif ($val['type'] == 'boolean') {
 		$value = (GETPOST($key) == 'on' ? 1 : 0);
+	} elseif ($val['type'] == 'price') {
+		$value = price2num(GETPOST($key));
 	} else {
 		$value = GETPOST($key, 'alphanohtml');
 	}
-	if ($val['noteditable']) {
+	if (!empty($val['noteditable'])) {
 		print $object->showOutputField($val, $key, $value, '', '', '', 0);
 	} else {
 		print $object->showInputField($val, $key, $value, '', '', '', 0);

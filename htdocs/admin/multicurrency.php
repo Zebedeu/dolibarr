@@ -33,7 +33,7 @@ require_once DOL_DOCUMENT_ROOT.'/multicurrency/class/multicurrency.class.php';
 $langs->loadLangs(array('admin', 'multicurrency'));
 
 // Access control
-if (!$user->admin) {
+if (!$user->admin || empty($conf->multicurrency->enabled)) {
 	accessforbidden();
 }
 
@@ -45,7 +45,7 @@ $action = GETPOST('action', 'aZ09');
  * Actions
  */
 
-
+$reg = array();
 if (preg_match('/set_([a-z0-9_\-]+)/i', $action, $reg)) {
 	$code = $reg[1];
 	$value = GETPOST($code, 'alpha');
@@ -156,8 +156,9 @@ if ($resql) {
 $form = new Form($db);
 
 $page_name = "MultiCurrencySetup";
+$help_url = '';
 
-llxHeader('', $langs->trans($page_name));
+llxHeader('', $langs->trans($page_name), $help_url);
 
 // Subheader
 $linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'.$langs->trans("BackToModuleList").'</a>';
@@ -165,7 +166,7 @@ print load_fiche_titre($langs->trans($page_name), $linkback);
 
 // Configuration header
 $head = multicurrencyAdminPrepareHead();
-print dol_get_fiche_head($head, 'settings', $langs->trans("ModuleSetup"), -1, "multicurrency");
+print dol_get_fiche_head($head, 'settings', $langs->trans($page_name), -1, "multicurrency");
 
 
 print '<table class="noborder centpercent">';
@@ -303,7 +304,7 @@ print '<input type="hidden" name="action" value="add_currency">';
 print '<tr class="oddeven">';
 print '<td>'.$form->selectCurrency('', 'code', 1).'</td>';
 print '<td class="right">';
-print '<input type="text" name="rate" value="" size="13" placeholder="'.$langs->trans('Rate').'" />&nbsp;';
+print '<input type="text" name="rate" value="" class="width75 right" placeholder="'.$langs->trans('Rate').'" />&nbsp;';
 print '<input type="submit" class="button" value="'.$langs->trans("Add").'">';
 print '</td>';
 print '</tr>';
@@ -328,7 +329,7 @@ foreach ($TCurrency as &$currency) {
 	print '<input type="hidden" name="action" value="update_currency">';
 	print '<input type="hidden" name="fk_multicurrency" value="'.$currency->id.'">';
 	print '1 '.$conf->currency.' = ';
-	print '<input type="text" name="rate" value="'.($currency->rate->rate ? $currency->rate->rate : '').'" size="13" />&nbsp;'.$currency->code.'&nbsp;';
+	print '<input type="text" name="rate" class="width75 right" value="'.($currency->rate->rate ? $currency->rate->rate : '').'" size="13">&nbsp;'.$currency->code.'&nbsp;';
 	print '<input type="submit" name="updatecurrency" class="button" value="'.$langs->trans("Modify").'">&nbsp;';
 	print '<input type="submit" name="deletecurrency" class="button" value="'.$langs->trans("Delete").'">';
 	print '</form>';

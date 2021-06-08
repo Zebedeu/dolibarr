@@ -121,7 +121,7 @@ $form = new Form($db);
 $productstatic = new Product($db);
 $companystatic = new Societe($db);
 
-$title = $langs->trans("ProductsAndServices");
+$title = $langs->trans('Supplier')." - ".$langs->trans('ProductsAndServices');
 
 if ($fourn_id) {
 	$supplier = new Fournisseur($db);
@@ -131,12 +131,12 @@ if ($fourn_id) {
 
 
 $arrayofmassactions = array(
-	'generate_doc'=>$langs->trans("ReGeneratePDF"),
-	'builddoc'=>$langs->trans("PDFMerge"),
-	'presend'=>$langs->trans("SendByMail"),
+	'generate_doc'=>img_picto('', 'pdf', 'class="pictofixedwidth"').$langs->trans("ReGeneratePDF"),
+	'builddoc'=>img_picto('', 'pdf', 'class="pictofixedwidth"').$langs->trans("PDFMerge"),
+	'presend'=>img_picto('', 'email', 'class="pictofixedwidth"').$langs->trans("SendByMail"),
 );
 if ($user->rights->mymodule->supprimer) {
-	$arrayofmassactions['predelete'] = '<span class="fa fa-trash paddingrightonly"></span>'.$langs->trans("Delete");
+	$arrayofmassactions['predelete'] = img_picto('', 'delete', 'class="pictofixedwidth"').$langs->trans("Delete");
 }
 if (in_array($massaction, array('presend', 'predelete'))) {
 	$arrayofmassactions = array();

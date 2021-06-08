@@ -468,11 +468,11 @@ class Expedition extends CommonObject
 
 	// phpcs:disable PEAR.NamingConventions.ValidFunctionName.ScopeNotCamelCaps
 	/**
-	 * Create the detail (eat-by date) of the expedition line
+	 * Create the detail of the expedition line. Create 1 record into expeditiondet for each warehouse and n record for each lot in this warehouse into expeditiondet_batch.
 	 *
-	 * @param 	object		$line_ext		full line informations
+	 * @param 	object		$line_ext			Objet with full information of line. $line_ext->detail_batch must be an array of ExpeditionLineBatch
 	 * @param	array		$array_options		extrafields array
-	 * @return	int							<0 if KO, >0 if OK
+	 * @return	int								<0 if KO, >0 if OK
 	 */
 	public function create_line_batch($line_ext, $array_options = 0)
 	{
@@ -496,7 +496,7 @@ class Expedition extends CommonObject
 				// create shipment batch lines for stockLocation
 				foreach ($tab as $detbatch) {
 					if ($detbatch->entrepot_id == $stockLocation) {
-						if (!($detbatch->create($line_id) > 0)) {		// Create an expeditionlinebatch
+						if (!($detbatch->create($line_id) > 0)) {		// Create an ExpeditionLineBatch
 							$error++;
 						}
 					}
@@ -545,7 +545,7 @@ class Expedition extends CommonObject
 		$sql .= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_shipment_mode as s ON e.fk_shipping_method = s.rowid';
 		$sql .= " WHERE e.entity IN (".getEntity('expedition').")";
 		if ($id) {
-			$sql .= " AND e.rowid=".$id;
+			$sql .= " AND e.rowid = ".((int) $id);
 		}
 		if ($ref) {
 			$sql .= " AND e.ref='".$this->db->escape($ref)."'";
@@ -1143,7 +1143,7 @@ class Expedition extends CommonObject
 		$sql .= " model_pdf=".(isset($this->model_pdf) ? "'".$this->db->escape($this->model_pdf)."'" : "null").",";
 		$sql .= " entity=".$conf->entity;
 
-		$sql .= " WHERE rowid=".$this->id;
+		$sql .= " WHERE rowid=".((int) $this->id);
 
 		$this->db->begin();
 
@@ -2033,7 +2033,7 @@ class Expedition extends CommonObject
 		$sql = "SELECT em.rowid, em.code, em.libelle as label, em.description, em.tracking, em.active";
 		$sql .= " FROM ".MAIN_DB_PREFIX."c_shipment_mode as em";
 		if ($id != '') {
-			$sql .= " WHERE em.rowid=".$id;
+			$sql .= " WHERE em.rowid=".((int) $id);
 		}
 
 		$resql = $this->db->query($sql);
@@ -2072,7 +2072,7 @@ class Expedition extends CommonObject
 			$sql .= ",libelle='".$this->db->escape($this->update['libelle'])."'";
 			$sql .= ",description='".$this->db->escape($this->update['description'])."'";
 			$sql .= ",tracking='".$this->db->escape($this->update['tracking'])."'";
-			$sql .= " WHERE rowid=".$id;
+			$sql .= " WHERE rowid=".((int) $id);
 			$resql = $this->db->query($sql);
 		}
 		if ($resql < 0) {
@@ -2682,7 +2682,7 @@ class ExpeditionLigne extends CommonObjectLine
 	{
 		$sql = 'SELECT ed.rowid, ed.fk_expedition, ed.fk_entrepot, ed.fk_origin_line, ed.qty, ed.rang';
 		$sql .= ' FROM '.MAIN_DB_PREFIX.$this->table_element.' as ed';
-		$sql .= ' WHERE ed.rowid = '.$rowid;
+		$sql .= ' WHERE ed.rowid = '.((int) $rowid);
 		$result = $this->db->query($sql);
 		if ($result) {
 			$objp = $this->db->fetch_object($result);
@@ -2952,7 +2952,7 @@ class ExpeditionLigne extends CommonObjectLine
 					// delete lot expedition line
 					$sql = "DELETE FROM ".MAIN_DB_PREFIX."expeditiondet_batch";
 					$sql .= " WHERE fk_expeditiondet = ".$this->id;
-					$sql .= " AND rowid = ".$expedition_batch_id;
+					$sql .= " AND rowid = ".((int) $expedition_batch_id);
 
 					if (!$this->db->query($sql)) {
 						$this->errors[] = $this->db->lasterror()." - sql=$sql";

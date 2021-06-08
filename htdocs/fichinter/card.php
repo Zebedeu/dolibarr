@@ -510,7 +510,7 @@ if (empty($reshook)) {
 		}
 	} elseif ($action == 'classifybilled' && $user->rights->ficheinter->creer) {
 		// Classify Billed
-		$result = $object->setStatut(2);
+		$result = $object->setStatut(Fichinter::STATUS_BILLED);
 		if ($result > 0) {
 			header('Location: '.$_SERVER["PHP_SELF"].'?id='.$object->id);
 			exit;
@@ -519,7 +519,7 @@ if (empty($reshook)) {
 		}
 	} elseif ($action == 'classifyunbilled' && $user->rights->ficheinter->creer) {
 		// Classify unbilled
-		$result = $object->setStatut(1);
+		$result = $object->setStatut(Fichinter::STATUS_VALIDATED);
 		if ($result > 0) {
 			header('Location: '.$_SERVER["PHP_SELF"].'?id='.$object->id);
 			exit;
@@ -528,7 +528,7 @@ if (empty($reshook)) {
 		}
 	} elseif ($action == 'classifydone' && $user->rights->ficheinter->creer) {
 		// Classify Done
-		$result = $object->setStatut(3);
+		$result = $object->setStatut(Fichinter::STATUS_CLOSED);
 		if ($result > 0) {
 			header('Location: '.$_SERVER["PHP_SELF"].'?id='.$object->id);
 			exit;
@@ -759,7 +759,10 @@ if (!empty($conf->projet->enabled)) {
 	$formproject = new FormProjets($db);
 }
 
-llxHeader('', $langs->trans("Intervention"));
+
+$help_url = 'EN:Module_Interventions';
+
+llxHeader('', $langs->trans("Intervention"), $help_url);
 
 if ($action == 'create') {
 	// Create new intervention
@@ -872,9 +875,9 @@ if ($action == 'create') {
 			print '<tr><td>'.$langs->trans("Project").'</td><td>';
 			/* Fix: If a project must be linked to any companies (suppliers or not), project must be not be set as limited to customer but must be not linked to any particular thirdparty
 			if ($societe->fournisseur==1)
-				$numprojet=select_projects(-1,$_POST["projectid"],'projectid');
+				$numprojet=select_projects(-1, GETPOST("projectid", 'int'), 'projectid');
 			else
-				$numprojet=select_projects($societe->id,$_POST["projectid"],'projectid');
+				$numprojet=select_projects($societe->id, GETPOST("projectid", 'int'), 'projectid');
 				*/
 			$numprojet = $formproject->select_projects($soc->id, $projectid, 'projectid');
 			if ($numprojet == 0) {
@@ -1543,8 +1546,9 @@ if ($action == 'create') {
 				// Validate
 				if ($object->statut == Fichinter::STATUS_DRAFT && (count($object->lines) > 0 || !empty($conf->global->FICHINTER_DISABLE_DETAILS))) {
 					if ((empty($conf->global->MAIN_USE_ADVANCED_PERMS) && $user->rights->ficheinter->creer) || (!empty($conf->global->MAIN_USE_ADVANCED_PERMS) && $user->rights->ficheinter->ficheinter_advance->validate)) {
-						print '<div class="inline-block divButAction"><a class="butAction" href="card.php?id='.$object->id.'&action=validate"';
-						print '>'.$langs->trans("Validate").'</a></div>';
+						print '<div class="inline-block divButAction"><a class="butAction" href="card.php?id='.$object->id.'&action=validate">'.$langs->trans("Validate").'</a></div>';
+					} else {
+						print '<div class="inline-block divButActionRefused"><span class="butActionRefused" href="#" title="'.dol_escape_htmltag($langs->trans("NotEnoughPermissions")).'">'.$langs->trans("Validate").'</span></div>';
 					}
 				}
 
@@ -1579,7 +1583,7 @@ if ($action == 'create') {
 					}
 				}
 
-				// create intervention model
+				// Create intervention model
 				if ($conf->global->MAIN_FEATURES_LEVEL >= 1 && $object->statut == Fichinter::STATUS_DRAFT && $user->rights->ficheinter->creer && (count($object->lines) > 0)) {
 					print '<div class="inline-block divButAction">';
 					print '<a class="butAction" href="'.DOL_URL_ROOT.'/fichinter/card-rec.php?id='.$object->id.'&action=create">'.$langs->trans("ChangeIntoRepeatableIntervention").'</a>';

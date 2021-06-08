@@ -3,7 +3,7 @@
  * Copyright (C) 2004-2018  Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2005-2018  Regis Houssin           <regis.houssin@inodbox.com>
  * Copyright (C) 2011       Herve Prot              <herve.prot@symeos.com>
- * Copyright (C) 2019       Frédéric France         <frederic.france@netlogic.fr>
+ * Copyright (C) 2019-2021  Frédéric France         <frederic.france@netlogic.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,23 +28,13 @@
 require '../../main.inc.php';
 require_once DOL_DOCUMENT_ROOT.'/user/class/usergroup.class.php';
 
-if (!empty($conf->global->MAIN_USE_ADVANCED_PERMS)) {
-	if (!$user->rights->user->group_advance->read && !$user->admin) {
-		accessforbidden();
-	}
-}
-
-// Users/Groups management only in master entity if transverse mode
-if (!empty($conf->multicompany->enabled) && $conf->entity > 1 && $conf->global->MULTICOMPANY_TRANSVERSE_MODE) {
-	accessforbidden();
-}
-
 // Load translation files required by page
 $langs->load("users");
 
 $sall = trim((GETPOST('search_all', 'alphanohtml') != '') ?GETPOST('search_all', 'alphanohtml') : GETPOST('sall', 'alphanohtml'));
 $search_group = GETPOST('search_group');
 $optioncss = GETPOST('optioncss', 'alpha');
+$massaction = GETPOST('massaction', 'alpha'); // The bulk action (combo box choice into lists)
 
 // Defini si peux lire/modifier utilisateurs et permisssions
 $caneditperms = ($user->admin || $user->rights->user->user->creer);
@@ -77,6 +67,21 @@ $fieldstosearchall = array(
 	'g.nom'=>"Group",
 	'g.note'=>"Note"
 );
+
+if (!empty($conf->global->MAIN_USE_ADVANCED_PERMS)) {
+	if (!$user->rights->user->group_advance->read && !$user->admin) {
+		accessforbidden();
+	}
+}
+
+// Users/Groups management only in master entity if transverse mode
+if (!empty($conf->multicompany->enabled) && $conf->entity > 1 && $conf->global->MULTICOMPANY_TRANSVERSE_MODE) {
+	accessforbidden();
+}
+
+if (!$user->rights->user->user->lire && !$user->admin) {
+	accessforbidden();
+}
 
 
 /*

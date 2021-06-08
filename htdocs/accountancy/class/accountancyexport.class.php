@@ -542,28 +542,28 @@ class AccountancyExport
 
 			// Credit invoice - invert sens
 			/*
-            if ($data->montant < 0) {
-                if ($data->sens == 'C') {
-                    $Tab['sens'] = 'D';
-                } else {
-                    $Tab['sens'] = 'C';
-                }
-                $Tab['signe_montant'] = '-';
-            } else {
-                $Tab['sens'] = $data->sens; // C or D
-                $Tab['signe_montant'] = '+';
-            }*/
+			if ($data->montant < 0) {
+				if ($data->sens == 'C') {
+					$Tab['sens'] = 'D';
+				} else {
+					$Tab['sens'] = 'C';
+				}
+				$Tab['signe_montant'] = '-';
+			} else {
+				$Tab['sens'] = $data->sens; // C or D
+				$Tab['signe_montant'] = '+';
+			}*/
 			$Tab['sens'] = $data->sens; // C or D
 			$Tab['signe_montant'] = '+';
 
 			// The amount must be in centimes without decimal points.
-			$Tab['montant'] = str_pad(abs(($data->debit - $abs->credit) * 100), 12, '0', STR_PAD_LEFT);
+			$Tab['montant'] = str_pad(abs(($data->debit - $data->credit) * 100), 12, '0', STR_PAD_LEFT);
 			$Tab['contrepartie'] = str_repeat(' ', 8);
 
 			// Force date format : %d%m%y
-			if (!empty($data->date_echeance)) {
-				//$Tab['date_echeance'] = dol_print_date($data->date_echeance, $conf->global->ACCOUNTING_EXPORT_DATE);
-				$Tab['date_echeance'] = dol_print_date($data->date_echeance, '%d%m%y'); // Format must be ddmmyy
+			if (!empty($data->date_lim_reglement)) {
+				//$Tab['date_echeance'] = dol_print_date($data->date_lim_reglement, $conf->global->ACCOUNTING_EXPORT_DATE);
+				$Tab['date_echeance'] = dol_print_date($data->date_lim_reglement, '%d%m%y'); // Format must be ddmmyy
 			} else {
 				$Tab['date_echeance'] = '000000';
 			}
@@ -660,9 +660,9 @@ class AccountancyExport
 
 			$Tab['code_stat'] = str_repeat(' ', 4);
 
-			if (!empty($data->date_echeance)) {
-				//$Tab['date_echeance'] = dol_print_date($data->date_echeance, $conf->global->ACCOUNTING_EXPORT_DATE);
-				$Tab['date_echeance'] = dol_print_date($data->date_echeance, '%d%m%Y');
+			if (!empty($data->date_lim_reglement)) {
+				//$Tab['date_echeance'] = dol_print_date($data->date_lim_reglement, $conf->global->ACCOUNTING_EXPORT_DATE);
+				$Tab['date_echeance'] = dol_print_date($data->date_lim_reglement, '%d%m%Y');
 			} else {
 				$Tab['date_echeance'] = dol_print_date($data->doc_date, '%d%m%Y');
 			}
@@ -856,8 +856,8 @@ class AccountancyExport
 
 		foreach ($objectLines as $line) {
 			if ($line->debit == 0 && $line->credit == 0) {
-                //unset($array[$line]);
-            } else {
+				//unset($array[$line]);
+			} else {
 				$date_creation = dol_print_date($line->date_creation, '%Y%m%d');
 				$date_document = dol_print_date($line->doc_date, '%Y%m%d');
 				$date_lettering = dol_print_date($line->date_lettering, '%Y%m%d');
@@ -1644,7 +1644,7 @@ class AccountancyExport
 							// Get new customer invoice ref and company name
 							$sql = 'SELECT f.ref, s.nom FROM ' . MAIN_DB_PREFIX . 'facture as f';
 							$sql .= ' LEFT JOIN ' . MAIN_DB_PREFIX . 'societe AS s ON f.fk_soc = s.rowid';
-							$sql .= ' WHERE f.rowid = ' . $line->fk_doc;
+							$sql .= ' WHERE f.rowid = '.((int) $line->fk_doc);
 							$resql = $this->db->query($sql);
 							if ($resql) {
 								if ($obj = $this->db->fetch_object($resql)) {
@@ -1658,7 +1658,7 @@ class AccountancyExport
 							// Get new supplier invoice ref and company name
 							$sql = 'SELECT ff.ref, s.nom FROM ' . MAIN_DB_PREFIX . 'facture_fourn as ff';
 							$sql .= ' LEFT JOIN ' . MAIN_DB_PREFIX . 'societe AS s ON ff.fk_soc = s.rowid';
-							$sql .= ' WHERE ff.rowid = ' . $line->fk_doc;
+							$sql .= ' WHERE ff.rowid = '.((int) $line->fk_doc);
 							$resql = $this->db->query($sql);
 							if ($resql) {
 								if ($obj = $this->db->fetch_object($resql)) {

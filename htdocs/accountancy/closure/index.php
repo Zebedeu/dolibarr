@@ -29,22 +29,11 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/html.formaccounting.class.php';
 require_once DOL_DOCUMENT_ROOT.'/accountancy/class/bookkeeping.class.php';
 
 // Load translation files required by the page
-$langs->loadLangs(array("compta", "bills", "other", "main", "accountancy"));
+$langs->loadLangs(array("compta", "bills", "other", "accountancy"));
 
 $socid = GETPOST('socid', 'int');
 
 $action = GETPOST('action', 'aZ09');
-
-// Security check
-if (empty($conf->accounting->enabled)) {
-	accessforbidden();
-}
-if ($user->socid > 0) {
-	accessforbidden();
-}
-if (!$user->rights->accounting->fiscalyear->write) {
-	accessforbidden();
-}
 
 $object = new BookKeeping($db);
 
@@ -67,10 +56,23 @@ $search_date_start = dol_mktime(0, 0, 0, $month_start, 1, $year_start);
 $search_date_end = dol_get_last_day($year_end, $month_end);
 $year_current = $year_start;
 
+// Security check
+if (empty($conf->accounting->enabled)) {
+	accessforbidden();
+}
+if ($user->socid > 0) {
+	accessforbidden();
+}
+if (!$user->rights->accounting->fiscalyear->write) {
+	accessforbidden();
+}
+
+
 /*
  * Actions
  */
-if ($action == 'validate_movements_confirm' && $user->rights->accounting->fiscalyear->write) {
+
+if ($action == 'validate_movements_confirm' && !empty($user->rights->accounting->fiscalyear->write)) {
 	$result = $object->fetchAll();
 
 	if ($result < 0) {
@@ -89,9 +91,9 @@ if ($action == 'validate_movements_confirm' && $user->rights->accounting->fiscal
 
 				$sql = " UPDATE ".MAIN_DB_PREFIX."accounting_bookkeeping";
 				$sql .= " SET date_validated = '".$db->idate($now)."'";
-				$sql .= " WHERE rowid = ".$movement->id;
-				$sql .= " AND doc_date >= '" . dol_print_date($date_start, 'dayrfc') . "'";
-				$sql .= " AND doc_date <= '" . dol_print_date($date_end, 'dayrfc') . "'";
+				$sql .= " WHERE rowid = ".((int) $movement->id);
+				$sql .= " AND doc_date >= '" . $db->idate($date_start) . "'";
+				$sql .= " AND doc_date <= '" . $db->idate($date_end) . "'";
 
 				dol_syslog("/accountancy/closure/index.php :: Function validate_movement_confirm Specify movements as validated sql=".$sql, LOG_DEBUG);
 				$result = $db->query($sql);

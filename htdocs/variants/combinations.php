@@ -51,7 +51,6 @@ $delete_product = GETPOST('delete_product', 'alpha');
 // Security check
 $fieldvalue = (!empty($id) ? $id : $ref);
 $fieldtype = (!empty($ref) ? 'ref' : 'rowid');
-$result = restrictedArea($user, 'produit|service', $fieldvalue, 'product&product', '', '', $fieldtype);
 
 $prodstatic = new Product($db);
 $prodattr = new ProductAttribute($db);
@@ -63,6 +62,25 @@ if ($id > 0 || $ref) {
 }
 
 $selectedvariant = $_SESSION['addvariant_'.$object->id];
+
+// Security check
+if (empty($conf->variants->enabled)) {
+	accessforbidden('Module not enabled');
+}
+if ($user->socid > 0) { // Protection if external user
+	accessforbidden();
+}
+
+if ($object->id > 0) {
+	if ($object->type == $object::TYPE_PRODUCT) {
+		restrictedArea($user, 'produit', $object->id, 'product&product', '', '');
+	}
+	if ($object->type == $object::TYPE_SERVICE) {
+		restrictedArea($user, 'service', $object->id, 'product&product', '', '');
+	}
+} else {
+	restrictedArea($user, 'produit|service', $fieldvalue, 'product&product', '', '', $fieldtype);
+}
 
 
 /*
@@ -338,15 +356,25 @@ if (!empty($id) || !empty($ref)) {
 	$linkback = '<a href="'.DOL_URL_ROOT.'/product/list.php?type='.$object->type.'">'.$langs->trans("BackToList").'</a>';
 	$object->next_prev_filter = " fk_product_type = ".$object->type;
 
-	dol_banner_tab($object, 'ref', $linkback, ($user->socid ? 0 : 1), 'ref', '', '', '', 0, '', '', 1);
+	dol_banner_tab($object, 'ref', $linkback, ($user->socid ? 0 : 1), 'ref', '', '', '', 0, '', '');
 
 	print '<div class="fichecenter">';
 
 	print '<div class="underbanner clearboth"></div>';
-	print '<table class="border tableforfield" width="100%">';
+	print '<table class="border centpercent tableforfield">';
+
+	// Type
+	if (!empty($conf->product->enabled) && !empty($conf->service->enabled)) {
+		$typeformat = 'select;0:'.$langs->trans("Product").',1:'.$langs->trans("Service");
+		print '<tr><td class="titlefieldcreate">';
+		print (empty($conf->global->PRODUCT_DENY_CHANGE_PRODUCT_TYPE)) ? $form->editfieldkey("Type", 'fk_product_type', $object->type, $object, $usercancreate, $typeformat) : $langs->trans('Type');
+		print '</td><td>';
+		print $form->editfieldval("Type", 'fk_product_type', $object->type, $object, $usercancreate, $typeformat);
+		print '</td></tr>';
+	}
 
 	// TVA
-	print '<tr><td class="titlefield">'.$langs->trans("DefaultTaxRate").'</td><td>';
+	print '<tr><td class="titlefieldcreate">'.$langs->trans("DefaultTaxRate").'</td><td>';
 
 	$positiverates = '';
 	if (price2num($object->tva_tx)) {
@@ -396,9 +424,6 @@ if (!empty($id) || !empty($ref)) {
 		print '&nbsp;';
 	}
 	print "</td></tr>\n";
-
-
-
 
 	print "</table>\n";
 
@@ -715,7 +740,7 @@ if (!empty($id) || !empty($ref)) {
 				$prodstatic->fetch($prodcomb->fk_product_child);
 
 				print $form->formconfirm(
-					"combinations.php?id=".$id."&valueid=".$valueid,
+					"combinations.php?id=".urlencode($id)."&valueid=".urlencode($valueid),
 					$langs->trans('Delete'),
 					$langs->trans('ProductCombinationDeleteDialog', $prodstatic->ref),
 					"confirm_deletecombination",

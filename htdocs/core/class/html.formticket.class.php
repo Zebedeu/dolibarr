@@ -2,6 +2,7 @@
 /* Copyright (C) 2013-2015  Jean-François FERRY     <hello@librethic.io>
  * Copyright (C) 2016       Christophe Battarel     <christophe@altairis.fr>
  * Copyright (C) 2019       Frédéric France         <frederic.france@netlogic.fr>
+ * Copyright (C) 2021       Juanjo Menent			<jmenent@2byte.es>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -102,11 +103,13 @@ class FormTicket
 	 */
 	public function __construct($db)
 	{
+		global $conf;
+
 		$this->db = $db;
 
 		$this->action = 'add';
 
-		$this->withcompany = 1;
+		$this->withcompany = $conf->societe->enabled ? 1 : 0;
 		$this->withfromsocid = 0;
 		$this->withfromcontactid = 0;
 		//$this->withthreadid=0;
@@ -123,11 +126,12 @@ class FormTicket
 	/**
 	 * Show the form to input ticket
 	 *
-	 * @param  	int	 		$withdolfichehead		With dol_fiche_head
+	 * @param  	int	 		$withdolfichehead		With dol_get_fiche_head() and dol_get_fiche_end()
 	 * @param	string		$mode					Mode ('create' or 'edit')
+	 * @param	int			$public					1=If we show the form for the public interface
 	 * @return 	void
 	 */
-	public function showForm($withdolfichehead = 0, $mode = 'edit')
+	public function showForm($withdolfichehead = 0, $mode = 'edit', $public = 0)
 	{
 		global $conf, $langs, $user, $hookmanager;
 
@@ -167,13 +171,15 @@ class FormTicket
 		if ($this->withref) {
 			// Ref
 			$defaultref = $ticketstat->getDefaultRef();
-			print '<tr><td class="titlefieldcreate"><span class="fieldrequired">'.$langs->trans("Ref").'</span></td><td><input size="18" type="text" name="ref" value="'.(GETPOST("ref", 'alpha') ? GETPOST("ref", 'alpha') : $defaultref).'"></td></tr>';
+			print '<tr><td class="titlefieldcreate"><span class="fieldrequired">'.$langs->trans("Ref").'</span></td><td>';
+			print '<input type="text" name="ref" value="'.dol_escape_htmltag(GETPOST("ref", 'alpha') ? GETPOST("ref", 'alpha') : $defaultref).'">';
+			print '</td></tr>';
 		}
 
 		// TITLE
 		if ($this->withemail) {
 			print '<tr><td class="titlefield"><label for="email"><span class="fieldrequired">'.$langs->trans("Email").'</span></label></td><td>';
-			print '<input  class="text minwidth200" id="email" name="email" value="'.(GETPOST('email', 'alpha') ? GETPOST('email', 'alpha') : $subject).'" />';
+			print '<input  class="text minwidth200" id="email" name="email" value="'.(GETPOST('email', 'alpha') ? GETPOST('email', 'alpha') : $subject).'" autofocus>';
 			print '</td></tr>';
 		}
 
@@ -181,6 +187,7 @@ class FormTicket
 		if (isset($this->param['origin']) && $this->param['originid'] > 0) {
 			// Parse element/subelement (ex: project_task)
 			$element = $subelement = $this->param['origin'];
+			$regs = array();
 			if (preg_match('/^([^_]+)_([^_]+)/i', $this->param['origin'], $regs)) {
 				$element = $regs[1];
 				$subelement = $regs[2];
@@ -207,7 +214,11 @@ class FormTicket
 
 		// Group
 		print '<tr><td><span class="fieldrequired"><label for="selectcategory_code">'.$langs->trans("TicketCategory").'</span></label></td><td>';
-		$this->selectGroupTickets((GETPOST('category_code') ? GETPOST('category_code') : $this->category_code), 'category_code', '', 2, 0, 0, 0, 'minwidth200');
+		$filter = '';
+		if ($public) {
+			$filter = 'public=1';
+		}
+		$this->selectGroupTickets((GETPOST('category_code') ? GETPOST('category_code') : $this->category_code), 'category_code', $filter, 2, 0, 0, 0, 'minwidth200');
 		print '</td></tr>';
 
 		// Severity
@@ -248,7 +259,7 @@ class FormTicket
 		$doleditor->Create();
 		print '</td></tr>';
 
-		if (!empty($conf->global->MAIN_SECURITY_ENABLECAPTCHA)) {
+		if ($public && !empty($conf->global->MAIN_SECURITY_ENABLECAPTCHA)) {
 			require_once DOL_DOCUMENT_ROOT.'/core/lib/security2.lib.php';
 			print '<tr><td class="titlefield"><label for="email"><span class="fieldrequired">'.$langs->trans("SecurityCode").'</span></label></td><td>';
 			print '<span class="span-icon-security inline-block">';
@@ -306,7 +317,7 @@ class FormTicket
 			if ($this->withfile == 2) { // Can add other files
 				$out .= '<input type="file" class="flat" id="addedfile" name="addedfile" value="'.$langs->trans("Upload").'" />';
 				$out .= ' ';
-				$out .= '<input type="submit" class="button" id="addfile" name="addfile" value="'.$langs->trans("MailingAddFile").'" />';
+				$out .= '<input type="submit" class="button smallpaddingimp reposition" id="addfile" name="addfile" value="'.$langs->trans("MailingAddFile").'" />';
 			}
 			$out .= "</td></tr>\n";
 
@@ -438,13 +449,15 @@ class FormTicket
 			print dol_get_fiche_end();
 		}
 
-		print '<div class="center">';
-		print '<input class="button" type="submit" name="add" value="'.$langs->trans(($this->withthreadid > 0 ? "SendResponse" : "NewTicket")).'" />';
+		print '<br><div class="center">';
+		print '<input class="button" type="submit" name="add" value="'.$langs->trans(($this->withthreadid > 0 ? "SendResponse" : "CreateTicket")).'" />';
 		if ($this->withcancel) {
 			print " &nbsp; &nbsp; &nbsp;";
 			print '<input class="button button-cancel" type="submit" name="cancel" value="'.$langs->trans("Cancel").'">';
 		}
 		print '</div>';
+
+		print '<input type="hidden" name="page_y">'."\n";
 
 		print "</form>\n";
 		print "<!-- End form TICKET -->\n";
@@ -517,7 +530,7 @@ class FormTicket
 					print ' selected="selected"';
 				} elseif ($selected == $id) {
 					print ' selected="selected"';
-				} elseif ($arraytypes['use_default'] == "1" && !$empty) {
+				} elseif ($arraytypes['use_default'] == "1" && !$selected && !$empty) {
 					print ' selected="selected"';
 				}
 
@@ -550,100 +563,200 @@ class FormTicket
 	 *
 	 *      @param  string $selected    Id categorie pre-selectionnée
 	 *      @param  string $htmlname    Nom de la zone select
-	 *      @param  string $filtertype  To filter on field type in llx_c_ticket_category (array('code'=>xx,'label'=>zz))
+	 *      @param  string $filtertype  To filter on some properties in llx_c_ticket_category ('public = 1'). This parameter must not come from input of users.
 	 *      @param  int    $format      0=id+libelle, 1=code+code, 2=code+libelle, 3=id+code
 	 *      @param  int    $empty       1=peut etre vide, 0 sinon
 	 *      @param  int    $noadmininfo 0=Add admin info, 1=Disable admin info
 	 *      @param  int    $maxlength   Max length of label
 	 *      @param	string	$morecss	More CSS
+	 * 		@param	int 	$use_multilevel	if != 0 create a multilevel select ( Do not use any of the other params)
 	 *      @return void
 	 */
-	public function selectGroupTickets($selected = '', $htmlname = 'ticketcategory', $filtertype = '', $format = 0, $empty = 0, $noadmininfo = 0, $maxlength = 0, $morecss = '')
+	public function selectGroupTickets($selected = '', $htmlname = 'ticketcategory', $filtertype = '', $format = 0, $empty = 0, $noadmininfo = 0, $maxlength = 0, $morecss = '', $use_multilevel = 0)
 	{
 		global $langs, $user;
 
-		$ticketstat = new Ticket($this->db);
+		if ($use_multilevel == 0) {
+			$ticketstat = new Ticket($this->db);
 
-		dol_syslog(get_class($this)."::selectCategoryTickets ".$selected.", ".$htmlname.", ".$filtertype.", ".$format, LOG_DEBUG);
+			dol_syslog(get_class($this)."::selectCategoryTickets ".$selected.", ".$htmlname.", ".$filtertype.", ".$format, LOG_DEBUG);
 
-		$filterarray = array();
+			$ticketstat->loadCacheCategoriesTickets();
 
-		if ($filtertype != '' && $filtertype != '-1') {
-			$filterarray = explode(',', $filtertype);
-		}
-
-		$ticketstat->loadCacheCategoriesTickets();
-
-		print '<select id="select'.$htmlname.'" class="flat minwidth100'.($morecss ? ' '.$morecss : '').'" name="'.$htmlname.'">';
-		if ($empty) {
-			print '<option value="">&nbsp;</option>';
-		}
-
-		if (is_array($ticketstat->cache_category_tickets) && count($ticketstat->cache_category_tickets)) {
-			foreach ($ticketstat->cache_category_tickets as $id => $arraycategories) {
-				// On passe si on a demande de filtrer sur des modes de paiments particuliers
-				if (count($filterarray) && !in_array($arraycategories['type'], $filterarray)) {
-					continue;
-				}
-
-				// We discard empty line if showempty is on because an empty line has already been output.
-				if ($empty && empty($arraycategories['code'])) {
-					continue;
-				}
-
-				if ($format == 0) {
-					print '<option value="'.$id.'"';
-				}
-
-				if ($format == 1) {
-					print '<option value="'.$arraycategories['code'].'"';
-				}
-
-				if ($format == 2) {
-					print '<option value="'.$arraycategories['code'].'"';
-				}
-
-				if ($format == 3) {
-					print '<option value="'.$id.'"';
-				}
-
-				// Si selected est text, on compare avec code, sinon avec id
-				if (preg_match('/[a-z]/i', $selected) && $selected == $arraycategories['code']) {
-					print ' selected="selected"';
-				} elseif ($selected == $id) {
-					print ' selected="selected"';
-				} elseif ($arraycategories['use_default'] == "1" && !$empty) {
-					print ' selected="selected"';
-				}
-
-				print '>';
-
-				if ($format == 0) {
-					$value = ($maxlength ? dol_trunc($arraycategories['label'], $maxlength) : $arraycategories['label']);
-				}
-
-				if ($format == 1) {
-					$value = $arraycategories['code'];
-				}
-
-				if ($format == 2) {
-					$value = ($maxlength ? dol_trunc($arraycategories['label'], $maxlength) : $arraycategories['label']);
-				}
-
-				if ($format == 3) {
-					$value = $arraycategories['code'];
-				}
-
-				print $value ? $value : '&nbsp;';
-				print '</option>';
+			print '<select id="select'.$htmlname.'" class="flat minwidth100'.($morecss ? ' '.$morecss : '').'" name="'.$htmlname.'">';
+			if ($empty) {
+				print '<option value="">&nbsp;</option>';
 			}
-		}
-		print '</select>';
-		if ($user->admin && !$noadmininfo) {
-			print info_admin($langs->trans("YouCanChangeValuesForThisListFromDictionarySetup"), 1);
-		}
 
-		print ajax_combobox('select'.$htmlname);
+			if (is_array($ticketstat->cache_category_tickets) && count($ticketstat->cache_category_tickets)) {
+				foreach ($ticketstat->cache_category_tickets as $id => $arraycategories) {
+					// Exclude some record
+					if ($filtertype == 'public=1') {
+						if (empty($arraycategories['public'])) {
+							continue;
+						}
+					}
+
+					// We discard empty line if showempty is on because an empty line has already been output.
+					if ($empty && empty($arraycategories['code'])) {
+						continue;
+					}
+
+					if ($format == 0) {
+						print '<option value="'.$id.'"';
+					}
+
+					if ($format == 1) {
+						print '<option value="'.$arraycategories['code'].'"';
+					}
+
+					if ($format == 2) {
+						print '<option value="'.$arraycategories['code'].'"';
+					}
+
+					if ($format == 3) {
+						print '<option value="'.$id.'"';
+					}
+
+					// Si selected est text, on compare avec code, sinon avec id
+					if (preg_match('/[a-z]/i', $selected) && $selected == $arraycategories['code']) {
+						print ' selected="selected"';
+					} elseif ($selected == $id) {
+						print ' selected="selected"';
+					} elseif ($arraycategories['use_default'] == "1" && !$selected && !$empty) {
+						print ' selected="selected"';
+					}
+
+					print '>';
+
+					if ($format == 0) {
+						$value = ($maxlength ? dol_trunc($arraycategories['label'], $maxlength) : $arraycategories['label']);
+					}
+
+					if ($format == 1) {
+						$value = $arraycategories['code'];
+					}
+
+					if ($format == 2) {
+						$value = ($maxlength ? dol_trunc($arraycategories['label'], $maxlength) : $arraycategories['label']);
+					}
+
+					if ($format == 3) {
+						$value = $arraycategories['code'];
+					}
+
+					print $value ? $value : '&nbsp;';
+					print '</option>';
+				}
+			}
+			print '</select>';
+			if ($user->admin && !$noadmininfo) {
+				print info_admin($langs->trans("YouCanChangeValuesForThisListFromDictionarySetup"), 1);
+			}
+
+			print ajax_combobox('select'.$htmlname);
+		} else {
+			$groupticket=GETPOST('groupticket', 'aZ09');
+			$groupticketchild=GETPOST('groupticket_child', 'aZ09');
+			$arraycodenotparent[] = "";
+			$stringtoprint = '<span class="supportemailfield bold">'.$langs->trans("GroupOfTicket").'</span> ';
+			$stringtoprint .= '<select name="groupticket" id ="groupticket" class="maxwidth500 minwidth400">';
+			$stringtoprint .= '<option value="">&nbsp;</option>';
+
+			$sql = "SELECT ctc.rowid, ctc.code, ctc.label, ctc.fk_parent, ";
+			$sql .= $this->db->ifsql("ctc.rowid NOT IN (SELECT ctcfather.rowid FROM llx_c_ticket_category as ctcfather JOIN llx_c_ticket_category as ctcjoin ON ctcfather.rowid = ctcjoin.fk_parent)", "'NOTPARENT'", "'PARENT'")." as isparent";
+			$sql .= " FROM ".MAIN_DB_PREFIX."c_ticket_category as ctc";
+			$sql .= " WHERE ctc.public = 1";
+			$sql .= " AND ctc.active = 1";
+			$sql .= " AND ctc.fk_parent = 0";
+			$sql .= $this->db->order('ctc.pos', 'ASC');
+			$resql = $this->db->query($sql);
+			if ($resql) {
+				$num_rows = $this->db->num_rows($resql);
+				$i = 0;
+				while ($i < $num_rows) {
+					$obj = $this->db->fetch_object($resql);
+					if ($obj) {
+						$grouprowid = $obj->rowid;
+						$groupvalue = $obj->code;
+						$grouplabel = $obj->label;
+						$isparent = $obj->isparent;
+						$iselected = $groupticket == $obj->code ?'selected':'';
+						$stringtoprint .= '<option '.$iselected.' class="groupticket'.dol_escape_htmltag($grouprowid).'" value="'.dol_escape_htmltag($groupvalue).'" data-html="'.dol_escape_htmltag($grouplabel).'">'.dol_escape_htmltag($grouplabel).'</option>';
+						if ($isparent == 'NOTPARENT') {
+							$arraycodenotparent[] = $groupvalue;
+						}
+					}
+					$i++;
+				}
+			} else {
+				dol_print_error($this->db);
+			}
+			if ($num_rows == 1) {
+				return '<input type="hidden" name="groupticket" id="groupticket" value="'.dol_escape_htmltag($groupvalue).'">';
+			}
+			$stringtoprint .= '</select>&nbsp';
+
+			$stringtoprint .= '<select name="groupticket_child" id ="groupticket_child" class="maxwidth500 minwidth400">';
+			$stringtoprint .= '<option value="">&nbsp;</option>';
+
+			$sql = "SELECT ctc.rowid, ctc.code, ctc.label, ctc.fk_parent, ctcjoin.code as codefather";
+			$sql .= " FROM ".MAIN_DB_PREFIX."c_ticket_category as ctc";
+			$sql .= " JOIN ".MAIN_DB_PREFIX."c_ticket_category as ctcjoin ON ctc.fk_parent = ctcjoin.rowid";
+			$sql .= " WHERE ctc.public = 1";
+			$sql .= " AND ctc.active = 1";
+			$sql .= " AND ctc.fk_parent <> 0";
+			$sql .= $this->db->order('ctc.pos', 'ASC');
+			$resql = $this->db->query($sql);
+			if ($resql) {
+				$num_rows = $this->db->num_rows($resql);
+				$i = 0;
+				while ($i < $num_rows) {
+					$obj = $this->db->fetch_object($resql);
+					if ($obj) {
+						$grouprowid = $obj->rowid;
+						$groupvalue = $obj->code;
+						$grouplabel = $obj->label;
+						$fatherid = $obj->fk_parent;
+						$groupcodefather = $obj->codefather;
+						$iselected = $groupticketchild == $obj->code ?'selected':'';
+						$stringtoprint .= '<option '.$iselected.' class="groupticket_'.dol_escape_htmltag($fatherid).'_child" value="'.dol_escape_htmltag($groupvalue).'" data-html="'.dol_escape_htmltag($grouplabel).'">'.dol_escape_htmltag($grouplabel).'</option>';
+						$tabscript[] = 'if($("#groupticket")[0].value == "'.dol_escape_js($groupcodefather).'"){
+							$(".groupticket_'.dol_escape_htmltag($fatherid).'_child").show()
+						}else{
+							$(".groupticket_'.dol_escape_htmltag($fatherid).'_child").hide()
+						}';
+					}
+					$i++;
+				}
+			} else {
+				dol_print_error($this->db);
+			}
+			$stringtoprint .='</select>';
+
+			$stringtoprint .='<script>';
+			$stringtoprint .='var arraynotparents = '.json_encode($arraycodenotparent).';';
+			$stringtoprint .='if (arraynotparents.includes($("#groupticket")[0].value)){$("#groupticket_child").hide()}
+			else{';
+			foreach ($tabscript as $script) {
+				$stringtoprint .= $script;
+			};
+			$stringtoprint .='}
+			$("#groupticket").change(function() {
+				$("#groupticket_child")[0].value = ""
+				if (!arraynotparents.includes(this.value)) {
+				$("#groupticket_child").show()
+				} else {
+				$("#groupticket_child").hide()
+				}
+			';
+			foreach ($tabscript as $script) {
+				$stringtoprint .= $script;
+			};
+			$stringtoprint .='})';
+			$stringtoprint .='</script>';
+			return $stringtoprint;
+		}
 	}
 
 	/**
@@ -713,7 +826,7 @@ class FormTicket
 					print ' selected="selected"';
 				} elseif ($selected == $id) {
 					print ' selected="selected"';
-				} elseif ($arrayseverities['use_default'] == "1" && !$empty) {
+				} elseif ($arrayseverities['use_default'] == "1" && !$selected && !$empty) {
 					print ' selected="selected"';
 				}
 
@@ -986,6 +1099,8 @@ class FormTicket
 			print '</td></tr>';
 		}
 
+		$uselocalbrowser = false;
+
 		// Intro
 		// External users can't send message email
 		if ($user->rights->ticket->write && !$user->socid) {
@@ -996,15 +1111,15 @@ class FormTicket
 
 			print '</td><td>';
 			include_once DOL_DOCUMENT_ROOT.'/core/class/doleditor.class.php';
-			$uselocalbrowser = true;
 
-			$doleditor = new DolEditor('mail_intro', $mail_intro, '100%', 90, 'dolibarr_details', '', false, true, $conf->global->FCKEDITOR_ENABLE_SOCIETE, ROWS_2, 70);
+			$doleditor = new DolEditor('mail_intro', $mail_intro, '100%', 90, 'dolibarr_details', '', false, $uselocalbrowser, $conf->global->FCKEDITOR_ENABLE_SOCIETE, ROWS_2, 70);
 
 			$doleditor->Create();
 			print '</td></tr>';
 		}
 
 		// MESSAGE
+
 		$defaultmessage = "";
 		if (is_object($arraydefaultmessage) && $arraydefaultmessage->content) {
 			$defaultmessage = $arraydefaultmessage->content;
@@ -1034,7 +1149,7 @@ class FormTicket
 		//$toolbarname = 'dolibarr_details';
 		$toolbarname = 'dolibarr_notes';
 		include_once DOL_DOCUMENT_ROOT.'/core/class/doleditor.class.php';
-		$doleditor = new DolEditor('message', $defaultmessage, '100%', 200, $toolbarname, '', false, true, $conf->global->FCKEDITOR_ENABLE_SOCIETE, ROWS_5, 70);
+		$doleditor = new DolEditor('message', $defaultmessage, '100%', 200, $toolbarname, '', false, $uselocalbrowser, $conf->global->FCKEDITOR_ENABLE_SOCIETE, ROWS_5, 70);
 		$doleditor->Create();
 		print '</td></tr>';
 
@@ -1046,7 +1161,7 @@ class FormTicket
 			print $form->textwithpicto('', $langs->trans("TicketMessageMailSignatureHelp"), 1, 'help');
 			print '</td><td>';
 			include_once DOL_DOCUMENT_ROOT.'/core/class/doleditor.class.php';
-			$doleditor = new DolEditor('mail_signature', $mail_signature, '100%', 150, 'dolibarr_details', '', false, true, $conf->global->FCKEDITOR_ENABLE_SOCIETE, ROWS_2, 70);
+			$doleditor = new DolEditor('mail_signature', $mail_signature, '100%', 150, 'dolibarr_details', '', false, $uselocalbrowser, $conf->global->FCKEDITOR_ENABLE_SOCIETE, ROWS_2, 70);
 			$doleditor->Create();
 			print '</td></tr>';
 		}
@@ -1080,7 +1195,7 @@ class FormTicket
 			if ($this->withfile == 2) { // Can add other files
 				$out .= '<input type="file" class="flat" id="addedfile" name="addedfile" value="'.$langs->trans("Upload").'" />';
 				$out .= ' ';
-				$out .= '<input type="submit" class="button" id="'.$addfileaction.'" name="'.$addfileaction.'" value="'.$langs->trans("MailingAddFile").'" />';
+				$out .= '<input type="submit" class="button smallpaddingimp reposition" id="'.$addfileaction.'" name="'.$addfileaction.'" value="'.$langs->trans("MailingAddFile").'" />';
 			}
 			$out .= "</td></tr>\n";
 
@@ -1096,6 +1211,8 @@ class FormTicket
 			print '<input class="button button-cancel" type="submit" name="cancel" value="'.$langs->trans("Cancel").'">';
 		}
 		print "</center>\n";
+
+		print '<input type="hidden" name="page_y">'."\n";
 
 		print "</form>\n";
 		print "<!-- End form TICKET -->\n";

@@ -31,7 +31,7 @@ require_once DOL_DOCUMENT_ROOT.'/cashdesk/include/environnement.php';
 require_once DOL_DOCUMENT_ROOT.'/cashdesk/class/Auth.class.php';
 
 // Load translation files required by the page
-$langs->loadLangs(array("main", "admin", "cashdesk"));
+$langs->loadLangs(array("admin", "cashdesk"));
 
 $username = GETPOST("txtUsername");
 $password = GETPOST("pwdPassword");
@@ -40,6 +40,12 @@ $warehouseid = (GETPOST("warehouseid") > 0) ?GETPOST("warehouseid", 'int') : $co
 $bankid_cash = (GETPOST("CASHDESK_ID_BANKACCOUNT_CASH") > 0) ?GETPOST("CASHDESK_ID_BANKACCOUNT_CASH", 'int') : $conf->global->CASHDESK_ID_BANKACCOUNT_CASH;
 $bankid_cheque = (GETPOST("CASHDESK_ID_BANKACCOUNT_CHEQUE") > 0) ?GETPOST("CASHDESK_ID_BANKACCOUNT_CHEQUE", 'int') : $conf->global->CASHDESK_ID_BANKACCOUNT_CHEQUE;
 $bankid_cb = (GETPOST("CASHDESK_ID_BANKACCOUNT_CB") > 0) ?GETPOST("CASHDESK_ID_BANKACCOUNT_CB", 'int') : $conf->global->CASHDESK_ID_BANKACCOUNT_CB;
+
+
+if (empty($user->rights->cashdesk->run)) {
+	accessforbidden();
+}
+
 
 // Check username
 if (empty($username)) {
